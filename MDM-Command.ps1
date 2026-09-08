@@ -18,6 +18,19 @@ $SystemId = {{device.id}}
 $ZipUrl   = 'https://raw.githubusercontent.com/rahultestingjc/jumpcl' +
     'oud-enrollment-deploy/main/JumpCloudEnrollment.zip'
 
+# ================= TENANT SETTINGS - EDIT THESE =================
+# Everything an organization changes lives HERE, not in the package.
+$OrgId          = 'YOUR_JUMPCLOUD_ORG_ID'   # required (console: Settings)
+$Region         = 'US'                      # US or EU tenant
+$CompanyName    = 'Your Organization'
+$SupportContact = 'your IT administrator'
+$AccentColor    = '#0E8A5F'                 # brand color (hex)
+$LogoPath       = ''                        # optional logo PNG on device
+$DeferMinutes   = 120                       # Remind Me Later snooze
+$LdapServer     = 'ldap.jumpcloud.com'      # rarely changed
+$LdapPort       = 636                       # 636 = LDAPS, 389 = StartTLS
+# ================================================================
+
 # Outside a JumpCloud command the variables stay unsubstituted and the
 # bare assignments parse as scriptblocks - refuse to continue.
 if ($ApiKey -isnot [string] -or $SystemId -isnot [string]) {
@@ -29,7 +42,7 @@ $SystemId = $SystemId.Trim().Trim("'").Trim('"')
 
 # Pinned SHA-256 of JumpCloudEnrollment.zip (set by the build). A zip
 # downloaded from $ZipUrl MUST match it - endpoints run this as SYSTEM.
-$ZipSha256 = 'C29A746BFAFC5ACAC2659EE251AF823E70A3234E54FEDF88C7BDE0B3BF93858B'
+$ZipSha256 = 'DF94B184B93E8812294A0E386B6050BDD2A73BDC5DB5E109106416F3C549A330'
 
 Set-ExecutionPolicy -Scope Process Bypass -Force
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -101,5 +114,10 @@ if (-not (Test-Path $entry)) {
 }
 
 # In-process invocation: the API key stays inside this PowerShell process
-# and never appears on any OS command line.
-& $entry -ApiKey $ApiKey -SystemId $SystemId
+# and never appears on any OS command line. Tenant settings flow through
+# as parameters and override the packaged defaults.
+& $entry -ApiKey $ApiKey -SystemId $SystemId -OrgId $OrgId `
+    -Region $Region -CompanyName $CompanyName `
+    -SupportContact $SupportContact -AccentColor $AccentColor `
+    -LogoPath $LogoPath -DeferMinutes $DeferMinutes `
+    -LdapServer $LdapServer -LdapPort $LdapPort
