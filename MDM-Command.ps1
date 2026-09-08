@@ -42,7 +42,7 @@ $SystemId = $SystemId.Trim().Trim("'").Trim('"')
 
 # Pinned SHA-256 of JumpCloudEnrollment.zip (set by the build). A zip
 # downloaded from $ZipUrl MUST match it - endpoints run this as SYSTEM.
-$ZipSha256 = 'DF94B184B93E8812294A0E386B6050BDD2A73BDC5DB5E109106416F3C549A330'
+$ZipSha256 = 'EB34B1823E6E6EA8E291FEBCFA2629A5A8415A1696203DB25554A156C783F0E1'
 
 Set-ExecutionPolicy -Scope Process Bypass -Force
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
