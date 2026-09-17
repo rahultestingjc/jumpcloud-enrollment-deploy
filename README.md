@@ -12,7 +12,7 @@ value lives in the command, so you never need to modify the package.
 | File | Purpose |
 |---|---|
 | `MDM-Command.ps1` | The only file you edit. Paste into a JumpCloud PowerShell command. |
-| `JumpCloudEnrollment.zip` | The generic enrollment app (UI + logic). Downloaded and SHA-256-verified by the command. Do not edit. |
+| `JumpCloudEnrollment.zip` | The generic enrollment app (UI + logic). Attach it to the command; the command SHA-256-verifies it. Do not edit. |
 | `SHA256.txt` | The zip's SHA-256 for manual verification. |
 
 ## Setup (5 minutes)
@@ -44,7 +44,13 @@ value lives in the command, so you never need to modify the package.
 3. Paste the edited `MDM-Command.ps1`. Keep the two bare
    `{{Apikey}}` / `{{device.id}}` assignments exactly as they are —
    JumpCloud substitutes them at dispatch, quotes included.
-4. Save, target your device group, run — or schedule it to repeat:
+4. **Attach `JumpCloudEnrollment.zip` to the command.** JumpCloud drops
+   attachments in `C:\Windows\Temp\`, where the command finds them. If
+   you prefer a download instead, host the zip at an HTTPS URL that the
+   devices can reach unauthenticated and set `$ZipUrl` to it — this
+   repository's own raw URLs only work while the repository is public.
+   Either way the pinned `$ZipSha256` must match the zip.
+5. Save, target your device group, run — or schedule it to repeat:
    deferred and already-enrolled devices exit quietly in under a second,
    which is what makes "Remind Me Later" re-prompt later.
 
@@ -57,9 +63,8 @@ value lives in the command, so you never need to modify the package.
 - Devices must not be domain-joined, Azure-AD-joined, or using a
   Microsoft account (the app detects these and shows a friendly
   "contact IT" screen instead).
-- Internet access to `ldap.jumpcloud.com:636`, the JumpCloud API, this
-  repository (zip download), and PSGallery (first run installs the
-  RunAsUser module).
+- Internet access to `ldap.jumpcloud.com:636`, the JumpCloud API, and
+  PSGallery (first run installs the RunAsUser module).
 
 ## What the user sees
 
@@ -76,7 +81,7 @@ support reference code), and "remind me later".
   TLS-protected LDAP bind, then disposed.
 - Plaintext LDAP is refused in code, regardless of configuration.
 - The command only runs a zip whose SHA-256 matches the hash pinned
-  inside the command, so a swapped download can't execute as SYSTEM.
+  inside the command, so a swapped package can't execute as SYSTEM.
 - Unknown email and wrong password produce the identical message (no
   account enumeration).
 - Diagnostics go to `C:\ProgramData\JumpCloudEnrollment\Logs`
@@ -87,5 +92,13 @@ support reference code), and "remind me later".
 
 Always take `MDM-Command.ps1` and `JumpCloudEnrollment.zip` from the
 same commit: the pinned hash means an old command deliberately refuses
-a newer zip. Re-apply your tenant settings to the new command and
-re-paste it in the console.
+a newer zip. Re-apply your tenant settings to the new command,
+re-paste it in the console, and replace the attached zip.
+
+## Changelog
+
+- **2026-09-17** — Username alignment now compares the local Windows
+  account against the JumpCloud user's System Username when they have
+  one, and only falls back to their Username when it is not set. Local
+  account renames target the same preferred name.
+- Startup no longer stalls 20–30 s on RDP/VDI sessions.

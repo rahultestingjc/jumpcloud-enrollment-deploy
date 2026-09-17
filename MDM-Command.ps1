@@ -5,7 +5,7 @@
 # JumpCloud console setup:
 #   - Command type: PowerShell, Run As: root
 #   - Timeout: at least 3900 seconds
-#   - no attachment needed: the zip is downloaded from $ZipUrl
+#   - ATTACH the file JumpCloudEnrollment.zip to this command
 #     (JumpCloud places attached files in C:\Windows\Temp\ on Windows)
 #   - the Apikey / device.id template variables are substituted at
 #     dispatch, quotes included: the BARE assignments below are
@@ -15,8 +15,7 @@
 # =====================================================================
 $ApiKey   = {{Apikey}}
 $SystemId = {{device.id}}
-$ZipUrl   = 'https://raw.githubusercontent.com/rahultestingjc/jumpcl' +
-    'oud-enrollment-deploy/main/JumpCloudEnrollment.zip'
+$ZipUrl   = ''
 
 # ================= TENANT SETTINGS - EDIT THESE =================
 # Everything an organization changes lives HERE, not in the package.
@@ -42,7 +41,7 @@ $SystemId = $SystemId.Trim().Trim("'").Trim('"')
 
 # Pinned SHA-256 of JumpCloudEnrollment.zip (set by the build). A zip
 # downloaded from $ZipUrl MUST match it - endpoints run this as SYSTEM.
-$ZipSha256 = 'EB34B1823E6E6EA8E291FEBCFA2629A5A8415A1696203DB25554A156C783F0E1'
+$ZipSha256 = '6E61F8A5DCCAAB65BCEF86A56075360D28E8644EDFE4C5FCA1B0C4408364C5A3'
 
 Set-ExecutionPolicy -Scope Process Bypass -Force
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
