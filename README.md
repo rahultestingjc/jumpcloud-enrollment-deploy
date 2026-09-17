@@ -30,6 +30,7 @@ value lives in the command, so you never need to modify the package.
    $LogoPath       = ''                        # optional logo PNG on device
    $LdapServer     = 'ldap.jumpcloud.com'      # rarely changed
    $LdapPort       = 636                       # 636 = LDAPS, 389 = StartTLS
+   $KeepLogs       = $false                    # $true keeps logs (debugging)
    # ================================================================
    ```
 
@@ -47,7 +48,8 @@ value lives in the command, so you never need to modify the package.
    `JumpCloudEnrollment.zip`, and the command refuses any zip whose
    SHA-256 does not match the pinned `$ZipSha256`. To deploy the zip as
    a command attachment instead, set `$ZipUrl = ''` — JumpCloud drops
-   attachments in `C:\Windows\Temp\`, where the command finds them.
+   attachments in `C:\Windows\Temp\`, where the command finds them. The
+   attached zip is hash-checked the same way.
 5. Save, target your device group, and run.
 
 ## When the window appears
@@ -88,13 +90,31 @@ support reference code), and "remind me later".
   disk, registry, logs, IPC, or the SYSTEM process; used once for the
   TLS-protected LDAP bind, then disposed.
 - Plaintext LDAP is refused in code, regardless of configuration.
-- The command only runs a zip whose SHA-256 matches the hash pinned
-  inside the command, so a swapped package can't execute as SYSTEM.
+- The command copies the zip into a private folder that only SYSTEM and
+  Administrators can open, checks that copy's SHA-256 against the hash
+  pinned in the command, and runs exactly the bytes it checked — in both
+  download and attachment mode.
+- The working files in `C:\ProgramData\JumpCloudEnrollment` are locked:
+  every run wipes the folder and re-creates it so that standard users can
+  read but never write or plant files there. If the folder can't be
+  proven to belong to SYSTEM/Administrators, the run stops.
+- The JumpCloud API key is only ever held in memory by the SYSTEM process.
 - Unknown email and wrong password produce the identical message (no
   account enumeration).
-- Diagnostics go to `C:\ProgramData\JumpCloudEnrollment\Logs`
-  (SYSTEM/Administrators only) and, on failure, into the device's
-  description field in your JumpCloud console.
+
+## What's left on the device
+
+Nothing. When the run ends, whatever the outcome, the command deletes
+its private folder, the attached zip, `C:\ProgramData\JumpCloudEnrollment`
+and the user's `ui.log`. The only thing kept is the RunAsUser PowerShell
+module, which is installed once from PSGallery.
+
+For debugging, set `$KeepLogs = $true`: the SYSTEM log
+(`C:\ProgramData\JumpCloudEnrollment\Logs\enrollment.log`, readable by
+Administrators only) and `%LOCALAPPDATA%\JumpCloudEnrollment\ui.log` are
+then kept. Either way, the one-line `Status:` summary appears in the
+command results, and failures are noted in the device's description
+field in your JumpCloud console.
 
 ## Updating
 
@@ -106,6 +126,11 @@ attachment mode).
 
 ## Changelog
 
+- **2026-09-17** — Locked working files and self-destruct. The package
+  is hash-checked in a private folder in attachment mode too; the staging
+  folder is locked so standard users can't plant or swap files; and
+  everything the command put on the device is deleted when it ends. New
+  `$KeepLogs` setting keeps the logs for debugging.
 - **2026-09-17** — No more registry state. The command no longer skips
   already-enrolled or recently deferred devices; it prompts on every run
   with a signed-in user. "Remind Me Later" closes the window until the

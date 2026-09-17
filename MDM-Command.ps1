@@ -12,6 +12,8 @@
 #     intentional and nothing else may share those lines
 #
 # Alternatively set $ZipUrl to an HTTPS location hosting the zip.
+# Either way the zip must match the SHA-256 pinned below, and everything
+# this command puts on the device is deleted when it finishes.
 # =====================================================================
 $ApiKey   = {{Apikey}}
 $SystemId = {{device.id}}
@@ -28,6 +30,7 @@ $AccentColor    = '#0E8A5F'                 # brand color (hex)
 $LogoPath       = ''                        # optional logo PNG on device
 $LdapServer     = 'ldap.jumpcloud.com'      # rarely changed
 $LdapPort       = 636                       # 636 = LDAPS, 389 = StartTLS
+$KeepLogs       = $false                    # $true keeps logs (debugging)
 # ================================================================
 
 # Outside a JumpCloud command the variables stay unsubstituted and the
@@ -41,82 +44,114 @@ $SystemId = $SystemId.Trim().Trim("'").Trim('"')
 
 # Pinned SHA-256 of JumpCloudEnrollment.zip (set by the build). A zip
 # downloaded from $ZipUrl MUST match it - endpoints run this as SYSTEM.
-$ZipSha256 = '121C01EA29CB1ECCC93D435677C3240FDBCE4CB646E276369B42B1DA4B85E12B'
+$ZipSha256 = '53DBCDD06D1DF21D5977B49CFC7347C553DFC33B7152AA6269D77E0CC683D982'
 
 Set-ExecutionPolicy -Scope Process Bypass -Force
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
+# Private working folder with a random name. CreateDirectory applies the
+# permissions (SYSTEM + Administrators only) at creation, so no other
+# user can ever open it, plant files in it, or swap the package inside.
+$sidType = [System.Security.Principal.SecurityIdentifier]
+$inheritType = [System.Security.AccessControl.InheritanceFlags]
+$inherit = $inheritType::ContainerInherit -bor $inheritType::ObjectInherit
+$workAcl = New-Object System.Security.AccessControl.DirectorySecurity
+$workAcl.SetAccessRuleProtection($true, $false)
+foreach ($sidText in @('S-1-5-18', 'S-1-5-32-544')) {
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+        (New-Object $sidType($sidText)), 'FullControl', $inherit, 'None', 'Allow')
+    $workAcl.AddAccessRule($rule)
+}
+$workName = 'Temp\JCEnroll-' + [guid]::NewGuid().ToString('N')
+$work = Join-Path $env:windir $workName
+try { [void][System.IO.Directory]::CreateDirectory($work, $workAcl) }
+catch {
+    Write-Host 'Status: RequiresAction | Issue: Could not create working folder'
+    exit 1
+}
+
 $zipName = 'JumpCloudEnrollment.zip'
-$zip = $null
-if (-not [string]::IsNullOrWhiteSpace($ZipUrl)) {
-    # URL mode: always fetch fresh, then verify against the pinned hash.
-    $zip = Join-Path 'C:\Windows\Temp' $zipName
-    try {
-        Invoke-WebRequest -Uri $ZipUrl -OutFile $zip -UseBasicParsing `
-            -ErrorAction Stop
+$zip = Join-Path $work 'package.zip'
+$sourceZip = $null
+$exitCode = 1
+try {
+    if (-not [string]::IsNullOrWhiteSpace($ZipUrl)) {
+        # URL mode: download straight into the private folder.
+        try {
+            Invoke-WebRequest -Uri $ZipUrl -OutFile $zip -UseBasicParsing `
+                -ErrorAction Stop
+        }
+        catch {
+            Write-Host 'Status: RequiresAction | Issue: Zip download failed'
+            Write-Host "Detail: $($_.Exception.Message)"
+            exit 1
+        }
     }
-    catch {
-        Write-Host 'Status: RequiresAction | Issue: Zip download failed'
-        Write-Host "Detail: $($_.Exception.Message)"
-        exit 1
+    else {
+        # Attachment mode: copy the zip JumpCloud placed on the device.
+        $candidates = @(
+            (Join-Path (Get-Location).Path $zipName),
+            (Join-Path $env:windir "Temp\$zipName"),
+            (Join-Path $env:TEMP $zipName)
+        )
+        foreach ($candidate in $candidates) {
+            if (Test-Path -LiteralPath $candidate) { $sourceZip = $candidate; break }
+        }
+        if (-not $sourceZip) {
+            Write-Host "Status: RequiresAction | Issue: $zipName not found"
+            Write-Host "Searched: $($candidates -join '; ')"
+            exit 1
+        }
+        Copy-Item -LiteralPath $sourceZip -Destination $zip -Force
+        Write-Host "Using package: $sourceZip"
     }
-    $actual = (Get-FileHash -Path $zip -Algorithm SHA256).Hash
+
+    # Hash the private copy: the bytes checked are the bytes that run.
+    $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
     if ($actual -ne $ZipSha256) {
-        Remove-Item $zip -Force -ErrorAction SilentlyContinue
         Write-Host 'Status: RequiresAction | Issue: Zip hash mismatch'
         Write-Host "Expected $ZipSha256 got $actual"
         exit 1
     }
     Write-Host 'Package hash verified.'
-}
-else {
-    # Attachment mode: use the zip JumpCloud placed on the device.
-    $candidates = @(
-        (Join-Path (Get-Location).Path $zipName),
-        (Join-Path 'C:\Windows\Temp' $zipName),
-        (Join-Path $env:TEMP $zipName)
-    )
-    foreach ($candidate in $candidates) {
-        if (Test-Path $candidate) { $zip = $candidate; break }
+
+    $appDir = Join-Path $work 'app'
+    try {
+        Expand-Archive -LiteralPath $zip -DestinationPath $appDir -Force `
+            -ErrorAction Stop
     }
-    if (-not $zip) {
-        Write-Host "Status: RequiresAction | Issue: $zipName not found"
-        Write-Host "Searched: $($candidates -join '; ')"
+    catch {
+        # Fallback for hosts where Microsoft.PowerShell.Archive misbehaves.
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $appDir)
+    }
+
+    $entry = Join-Path $appDir 'Invoke-JumpCloudEnrollment.ps1'
+    if (-not (Test-Path -LiteralPath $entry)) {
+        Write-Host 'Status: RequiresAction | Issue: entry script missing'
         exit 1
     }
-}
-Write-Host "Using package: $zip"
 
-$appDir = 'C:\ProgramData\JumpCloudEnrollment\app'
-try {
-    if (Test-Path $appDir) {
-        Remove-Item -Path $appDir -Recurse -Force -ErrorAction Stop
+    # In-process invocation: the API key stays inside this PowerShell
+    # process and never appears on any OS command line. Tenant settings
+    # flow through as parameters and override the packaged defaults.
+    & $entry -ApiKey $ApiKey -SystemId $SystemId -OrgId $OrgId `
+        -Region $Region -CompanyName $CompanyName `
+        -SupportContact $SupportContact -AccentColor $AccentColor `
+        -LogoPath $LogoPath -KeepLogs:$KeepLogs `
+        -LdapServer $LdapServer -LdapPort $LdapPort
+    $exitCode = $LASTEXITCODE
+}
+finally {
+    # Self-destruct. cmd's rmdir removes links without following them.
+    & cmd.exe /d /c rmdir /s /q $work 2>$null | Out-Null
+    if ($sourceZip) {
+        Remove-Item -LiteralPath $sourceZip -Force -ErrorAction SilentlyContinue
+    }
+    # Backstop: the enrollment script already cleared its staging folder.
+    if (-not $KeepLogs) {
+        $stagingRoot = 'C:\ProgramData\JumpCloudEnrollment'
+        & cmd.exe /d /c rmdir /s /q $stagingRoot 2>$null | Out-Null
     }
 }
-catch {
-    Write-Host 'Warning: could not fully clear app dir - overwriting.'
-}
-New-Item -ItemType Directory -Path $appDir -Force | Out-Null
-try {
-    Expand-Archive -Path $zip -DestinationPath $appDir -Force -ErrorAction Stop
-}
-catch {
-    # Fallback for hosts where Microsoft.PowerShell.Archive misbehaves.
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [System.IO.Compression.ZipFile]::ExtractToDirectory($zip, $appDir)
-}
-
-$entry = Join-Path $appDir 'Invoke-JumpCloudEnrollment.ps1'
-if (-not (Test-Path $entry)) {
-    Write-Host 'Status: RequiresAction | Issue: entry script missing'
-    exit 1
-}
-
-# In-process invocation: the API key stays inside this PowerShell process
-# and never appears on any OS command line. Tenant settings flow through
-# as parameters and override the packaged defaults.
-& $entry -ApiKey $ApiKey -SystemId $SystemId -OrgId $OrgId `
-    -Region $Region -CompanyName $CompanyName `
-    -SupportContact $SupportContact -AccentColor $AccentColor `
-    -LogoPath $LogoPath `
-    -LdapServer $LdapServer -LdapPort $LdapPort
+exit $exitCode
