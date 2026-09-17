@@ -5,7 +5,7 @@
 # JumpCloud console setup:
 #   - Command type: PowerShell, Run As: root
 #   - Timeout: at least 3900 seconds
-#   - ATTACH the file JumpCloudEnrollment.zip to this command
+#   - no attachment needed: the zip is downloaded from $ZipUrl
 #     (JumpCloud places attached files in C:\Windows\Temp\ on Windows)
 #   - the Apikey / device.id template variables are substituted at
 #     dispatch, quotes included: the BARE assignments below are
@@ -15,7 +15,8 @@
 # =====================================================================
 $ApiKey   = {{Apikey}}
 $SystemId = {{device.id}}
-$ZipUrl   = ''
+$ZipUrl   = 'https://raw.githubusercontent.com/rahultestingjc/jumpcl' +
+    'oud-enrollment-deploy/main/JumpCloudEnrollment.zip'
 
 # ================= TENANT SETTINGS - EDIT THESE =================
 # Everything an organization changes lives HERE, not in the package.

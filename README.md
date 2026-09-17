@@ -12,7 +12,7 @@ value lives in the command, so you never need to modify the package.
 | File | Purpose |
 |---|---|
 | `MDM-Command.ps1` | The only file you edit. Paste into a JumpCloud PowerShell command. |
-| `JumpCloudEnrollment.zip` | The generic enrollment app (UI + logic). Attach it to the command; the command SHA-256-verifies it. Do not edit. |
+| `JumpCloudEnrollment.zip` | The generic enrollment app (UI + logic). Downloaded and SHA-256-verified by the command. Do not edit. |
 | `SHA256.txt` | The zip's SHA-256 for manual verification. |
 
 ## Setup (5 minutes)
@@ -44,12 +44,11 @@ value lives in the command, so you never need to modify the package.
 3. Paste the edited `MDM-Command.ps1`. Keep the two bare
    `{{Apikey}}` / `{{device.id}}` assignments exactly as they are —
    JumpCloud substitutes them at dispatch, quotes included.
-4. **Attach `JumpCloudEnrollment.zip` to the command.** JumpCloud drops
-   attachments in `C:\Windows\Temp\`, where the command finds them. If
-   you prefer a download instead, host the zip at an HTTPS URL that the
-   devices can reach unauthenticated and set `$ZipUrl` to it — this
-   repository's own raw URLs only work while the repository is public.
-   Either way the pinned `$ZipSha256` must match the zip.
+4. No attachment needed: `$ZipUrl` already points at this repository's
+   `JumpCloudEnrollment.zip`, and the command refuses any zip whose
+   SHA-256 does not match the pinned `$ZipSha256`. To deploy the zip as
+   a command attachment instead, set `$ZipUrl = ''` — JumpCloud drops
+   attachments in `C:\Windows\Temp\`, where the command finds them.
 5. Save, target your device group, run — or schedule it to repeat:
    deferred and already-enrolled devices exit quietly in under a second,
    which is what makes "Remind Me Later" re-prompt later.
@@ -63,8 +62,9 @@ value lives in the command, so you never need to modify the package.
 - Devices must not be domain-joined, Azure-AD-joined, or using a
   Microsoft account (the app detects these and shows a friendly
   "contact IT" screen instead).
-- Internet access to `ldap.jumpcloud.com:636`, the JumpCloud API, and
-  PSGallery (first run installs the RunAsUser module).
+- Internet access to `ldap.jumpcloud.com:636`, the JumpCloud API,
+  `raw.githubusercontent.com` (zip download), and PSGallery (first run
+  installs the RunAsUser module).
 
 ## What the user sees
 
@@ -93,7 +93,8 @@ support reference code), and "remind me later".
 Always take `MDM-Command.ps1` and `JumpCloudEnrollment.zip` from the
 same commit: the pinned hash means an old command deliberately refuses
 a newer zip. Re-apply your tenant settings to the new command,
-re-paste it in the console, and replace the attached zip.
+and re-paste it in the console (and replace the attached zip if you use
+attachment mode).
 
 ## Changelog
 
