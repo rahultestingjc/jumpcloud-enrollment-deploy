@@ -26,7 +26,6 @@ $CompanyName    = 'Your Organization'
 $SupportContact = 'your IT administrator'
 $AccentColor    = '#0E8A5F'                 # brand color (hex)
 $LogoPath       = ''                        # optional logo PNG on device
-$DeferMinutes   = 120                       # Remind Me Later snooze
 $LdapServer     = 'ldap.jumpcloud.com'      # rarely changed
 $LdapPort       = 636                       # 636 = LDAPS, 389 = StartTLS
 # ================================================================
@@ -42,7 +41,7 @@ $SystemId = $SystemId.Trim().Trim("'").Trim('"')
 
 # Pinned SHA-256 of JumpCloudEnrollment.zip (set by the build). A zip
 # downloaded from $ZipUrl MUST match it - endpoints run this as SYSTEM.
-$ZipSha256 = '6E61F8A5DCCAAB65BCEF86A56075360D28E8644EDFE4C5FCA1B0C4408364C5A3'
+$ZipSha256 = '121C01EA29CB1ECCC93D435677C3240FDBCE4CB646E276369B42B1DA4B85E12B'
 
 Set-ExecutionPolicy -Scope Process Bypass -Force
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -119,5 +118,5 @@ if (-not (Test-Path $entry)) {
 & $entry -ApiKey $ApiKey -SystemId $SystemId -OrgId $OrgId `
     -Region $Region -CompanyName $CompanyName `
     -SupportContact $SupportContact -AccentColor $AccentColor `
-    -LogoPath $LogoPath -DeferMinutes $DeferMinutes `
+    -LogoPath $LogoPath `
     -LdapServer $LdapServer -LdapPort $LdapPort

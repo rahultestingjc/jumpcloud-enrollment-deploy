@@ -28,7 +28,6 @@ value lives in the command, so you never need to modify the package.
    $SupportContact = 'your IT administrator'
    $AccentColor    = '#0E8A5F'                 # brand color (hex)
    $LogoPath       = ''                        # optional logo PNG on device
-   $DeferMinutes   = 120                       # Remind Me Later snooze
    $LdapServer     = 'ldap.jumpcloud.com'      # rarely changed
    $LdapPort       = 636                       # 636 = LDAPS, 389 = StartTLS
    # ================================================================
@@ -49,9 +48,18 @@ value lives in the command, so you never need to modify the package.
    SHA-256 does not match the pinned `$ZipSha256`. To deploy the zip as
    a command attachment instead, set `$ZipUrl = ''` — JumpCloud drops
    attachments in `C:\Windows\Temp\`, where the command finds them.
-5. Save, target your device group, run — or schedule it to repeat:
-   deferred and already-enrolled devices exit quietly in under a second,
-   which is what makes "Remind Me Later" re-prompt later.
+5. Save, target your device group, and run.
+
+## When the window appears
+
+Every run prompts the signed-in user. Nothing is recorded on the device,
+so the prompt appears again after "Remind Me Later" and after a
+completed enrollment. The only run that skips the prompt is one where
+nobody is signed in; the command result then reads
+`Status: Deferred | Issue: No interactive user`.
+
+If you schedule the command to repeat, remove enrolled devices from the
+target group, or they are prompted again on the next run.
 
 ## Requirements
 
@@ -98,6 +106,12 @@ attachment mode).
 
 ## Changelog
 
+- **2026-09-17** — No more registry state. The command no longer skips
+  already-enrolled or recently deferred devices; it prompts on every run
+  with a signed-in user. "Remind Me Later" closes the window until the
+  next run, and the `$DeferMinutes` setting is gone. Devices that ran an
+  earlier version may still have an `HKLM\SOFTWARE\JumpCloudEnrollment`
+  key; nothing reads it, and it is safe to delete.
 - **2026-09-17** — Username alignment now compares the local Windows
   account against the JumpCloud user's System Username when they have
   one, and only falls back to their Username when it is not set. Local
